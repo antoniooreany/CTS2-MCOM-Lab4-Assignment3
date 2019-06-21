@@ -26,7 +26,7 @@
 	
 	.equ	BUTTONS_IRQ, 0x02	# Buttons PIO IRQ Level
 	.equ	KEY3, 		0x8		# KEY3 BITMASK  
-	.equ	KEY0, 		0x1		# BITMASK for KEY0
+	.equ	KEY0, 		0x1		# KEY0 BITMASK 
 	.equ	PIE, 		0x1		# CPU's interrupt enable bit
 	
 ###############################################################
@@ -157,11 +157,15 @@ _start:
 ###############################################
 # Definition von symbolen Konstanten
 ###############################################
+	#.equ PUSH_r9_1, subi sp, sp, 4
+	#.equ PUSH_r9_2, stw r9, (sp)
+	#.equ POP_r9_1, ldw r9, (sp)
+	#.equ POP_r9_2, addi sp, sp, 4
 	.equ STACK_SIZE, 0x400	# stack size
-	.equ PUSH_r9_1, subi sp, sp, 4
-	.equ PUSH_r9_2, stw r9, (sp)
-	.equ POP_r9_1, ldw r9, (sp)
-	.equ POP_r9_2, addi sp, sp, 4
+	.equ PERIODL_ADDR, 0xFF202008
+	.equ PERIODH_ADDR, 0xFF20200C
+	.equ CONTROL_ADDR, 0xFF202004
+	.equ STATUS_ADDR, 0xFF202000
 ###############################################
 # DATA SECTION
 # assumption: 12 kByte data section (0 - 0x2fff)
@@ -198,60 +202,105 @@ _start:
 	addi	sp, sp, STACK_SIZE	# stack start position should
 					# begin at end of section
 START:
-	mov r7, r0			# COUNTER init
-
-LOOP:
-	call write_LED		# subroutine write_LED is called
-	call read_COUNT_BUTTON	# subroutine read_COUNT_BUTTON is called
-	call read_CLEAR_BUTTON	# subroutine read_CLEAR_BUTTON is called
-	br LOOP			# check for the key pressed again
-
-read_COUNT_BUTTON:
-	PUSH_r9_1
-	PUSH_r9_2
-	movia r9, 0x840		# r9 <- 0x840
-	ldw r9, (r9)		# r9 <- (0x840)
-	andi r9, r9, 0x1	# r9 <- masked value of (0x840)
-	bne r9, r0, RELEASED	# Pressed: if r9!=0 => goto RELEASED
-	br return_read_COUNT_BUTTON
-RELEASED:
-	movia r9, 0x840		# r9 <- 0x840
-	ldw r9, (r9)		# r9 <- (0x840)
-	andi r9, r9, 0x1	# r9 <- masked value of (0x840)
-	bne r9, r0, RELEASED	# Pressed: if r9!=0 => goto RELEASED
-	addi r7, r7, 1		# Pressed: COUNTER++ 
-return_read_COUNT_BUTTON:
-	POP_r9_1
-	POP_r9_2
-	ret	
+###############################################
+main:
+	movi r7, 0b1111		# write parameter to switch LED0-LED3 on
+	call write_LED		# write_LED(r7)
 	
-read_CLEAR_BUTTON:
-	PUSH_r9_1
-	PUSH_r9_2
-	movia r9, 0x840		# r9 <- 0x840
-	ldw r9, (r9)		# r9 <- (0x840)
-	andi r9, r9, 0x8	# r9 <- masked value of (0x840)
-	beq r9, r0, return_CLEAR_BUTTON	# if r9==0 => goto return_COUNT_BUTTON 
-	mov r7, r0		# COUNTER=0
-return_CLEAR_BUTTON:
-	POP_r9_1
-	POP_r9_2
-	ret			# return
+	movia r15, 20		# r15 <- 20 = 2ms
+	call wait		# wait(r15)
+	
+	movi r7, 0b0011		# write parameter to switch LED0-LED1 on
+	call write_LED		# write_LED(r15)
+	
+	movia r15, 80		# r15 <- 80 = 8 ms
+	call wait		# wait(r15)
+	
+	beq r0, r0, main	# while(true) goto main
+###############################################
+wait:
+	subi sp, sp, 4		# PUSH_r15_1
+	stw r15, (sp)		# PUSH_r15_2
+	
+	muli r15, r15, 10000	# modify r15 to make it as int parameter for init_timer() with step 0.1ms 
 
+	subi sp, sp, 4		# PUSH_r31_1 (before calling the 2nd level subrotines)
+	stw r31, (sp)		# PUSH_r31_2 (before calling the 2nd level subrotines)
+
+	call init_timer		# call init_timer(r15)
+	call wait_timer		# call wait_timer()
+	
+	ldw r31, (sp)		# POP_r31_1 (after calling the 2nd level subrotines)
+	addi sp, sp, 4		# POP_r31_2 (after calling the 2nd level subrotines)	
+	
+	ldw r15, (sp)		# POP_r15_1
+	addi sp, sp, 4		# POP_r15_2	
+ret
+###############################################
+init_timer:
+	subi sp, sp, 4		# PUSH_r2_1
+	stw r2, (sp)		# PUSH_r2_2
+	
+	subi sp, sp, 4		# PUSH_r15_1
+	stw r15, (sp)		# PUSH_r15_2
+	
+	movia r2, PERIODL_ADDR	# PERIODL_ADDR -> r2
+	sth r15, (r2)		# r15L -> periodl 
+	movia r2, PERIODH_ADDR	# PERIODH_ADDR -> r2
+	srli r15, r15, 16	# shift right by 16 bits TODO: ?Or by 15 bits?
+	sth r15, (r2)		# r15H -> periodh
+	
+	ldw r15, (sp)		# POP_r15_1
+	addi sp, sp, 4		# POP_r15_2
+	
+	ldw r2, (sp)		# POP_r2_1
+	addi sp, sp, 4		# POP_r2_2 
+ret
+###############################################
+wait_timer:
+	subi sp, sp, 4		# PUSH_r2_1
+	stw r2, (sp)		# PUSH_r2_2
+	
+	subi sp, sp, 4		# PUSH_r15_1
+	stw r15, (sp)		# PUSH_r15_2
+	
+	movia r2, CONTROL_ADDR	# CONTROL_ADDR -> r2
+	ldw r15, (r2)		# content of control -> r15
+	ori r15, r15, 0b0100	# mask 2nd bit of the content of control (r15||0b0100 -> r15)
+	stw r15, (r2)		# start timer(masked content of control -> control)
+	movia r2, STATUS_ADDR	# STATUS_ADDR -> r2
+	stw r0, (r2)		# control <- 0 for explicit clear the timeout-bit
+WHILE:
+	movia r2, STATUS_ADDR	# STATUS_ADDR -> r2
+	ldw r15, (r2)		# status -> r15
+	andi r15, r15, 0b0001	# mask the content of the status
+	beq r15, r0, WHILE	# if timer is not expired(masked status == 0), check again
+				# the timer has expired(masked status != 0)
+				
+	ldw r15, (sp)		# POP_r15_1
+	addi sp, sp, 4		# POP_r15_2				
+				
+	ldw r2, (sp)		# POP_r2_1
+	addi sp, sp, 4		# POP_r2_2
+ret
+###############################################
 write_LED:
-	PUSH_r9_1
-	PUSH_r9_2
-	movia r9, 0x810		# r9 <- 0x810=output_register_address
+	subi sp, sp, 4		# PUSH_r9_1
+	stw r9, (sp)		# PUSH_r9_2
+	
+	movia r9, 0xFF200000	# r9 <- 0xFF200000=output_register_address
 	stw r7, (r9)		# r7 -> (r9) COUNTER -> output_register
-	POP_r9_1
-	POP_r9_2
-	ret
-
+	
+	ldw r9, (sp)		# POP_r9_1
+	addi sp, sp, 4		# POP_r9_2
+ret
+###############################################
 endloop:
 	br endloop		# that's it
 ###############################################
 	.end
-	
+
+
 ###############################################
 
 
@@ -267,7 +316,7 @@ endloop:
 # generation. KEY0 and KEY3 related interrupts
 # will be enabled.
 ###############################################################
-init_Buttons_PIO:
+init_Buttons_PIO:	#after init_intController
 	# save used registers on stack
 	subi sp, sp, 8
 	stw r2, 0(sp)
@@ -275,11 +324,11 @@ init_Buttons_PIO:
 
 	# enable KEY0 and KEY3 interrupts in Buttons PIO
 	# interrupt mask register
-	movia r2, KEY3
-	movia r3, KEY0
-	or r3, r3, r2
-	movia r2, BUTTONS
-	stw r3, 8(r2)
+	movia r2, KEY3	#Enabling interrupts for KEY0, KEY3 (0b1001->(0xFF200058))
+	movia r3, KEY0	#what is the KEY0=0b0001, KEY3=0b1000, BUTTONS addresses?
+	or r3, r3, r2	#why we do (0b0001 or 0b1000=some mask 0b1001)
+	movia r2, BUTTONS	#what is the starting address(BUTTONS=0xFF200050=data=Status of buttons KEY0, KEY1, KEY2 and KEY3)?	# base address of port Buttons	
+	stw r3, 8(r2)	# interruptmaskAddress=0xFF200058	
 
 	# restore used registers from stack
 	ldw r2, 0(sp)
@@ -290,23 +339,25 @@ init_Buttons_PIO:
 ###############################################################
 # init_intController
 ###############################################################
-init_intController:
+init_intController:	#very start
 	# save used registers on stack
 	subi sp, sp, 8
 	stw r2, 0(sp)
 	stw r3, 4(sp)
 
+	# what is the difference between (interruptmaskAddress=0xFF200058) and	(ctl3=Interrupt Enable Register)?
+
 	# enable (unmask) Buttons PIO interupts
-	movia r2, BUTTONS_IRQ
+	movia r2, BUTTONS_IRQ	#why BUTTONS_IRQ=0b0010?	# Buttons(mask) PIO IRQ Level
 	rdctl r3, ctl3
-	or r3, r3, r2
-	wrctl ctl3, r3
+	or r3, r3, r2	#mask ctl3 or 0b0010 for IRQ1 (did we choose IRQ1 arbitrarily?)
+	wrctl ctl3, r3	#mask ctl3 value. why Prof. name it unmask? How to implement unmasking?
 
 	# enable CPU interrupts
-	movia r2, PIE
+	movia r2, PIE	#0b0001		# CPU's interrupt enable bit
 	rdctl r3, ctl0
 	or r3, r3, r2
-	wrctl ctl0, r3
+	wrctl ctl0, r3	#masking LSB of ctl0(SR)
  
 	# restore used registers from stack
 	ldw r2, 0(sp)
