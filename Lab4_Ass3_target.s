@@ -63,8 +63,8 @@ interrupt_handler:	#does this handler executes without being called?
 	stw r31, (sp)
 
 	# Check if an Buttons PIO interrupt has occured	
-	rdctl et, ctl4				# read interrupt pending reg.
-	andi r2, et, BUTTONS_IRQ	# check Buttons interrupt
+	rdctl et, ctl4				#what is et? read interrupt pending reg.
+	andi r2, et, BUTTONS_IRQ	# BUTTONS_IRQ=0b0010 why 0b0010?	# Buttons PIO IRQ Level check Buttons interrupt
 	beq r2, zero, end_ir		# if no Buttons interrupt
 								# exit exception handler
 
@@ -74,7 +74,7 @@ interrupt_handler:	#does this handler executes without being called?
 	andi r2, r2, KEY0			# (KEY0=0b0001)mask KEY0 related bit
 	beq r2, zero, btn3_isr
 	call KEY0_ISR				# KEY0 has been pressed, do the
-								# corresponding interuupt handling
+						# corresponding interuupt handling
 
 	# clear KEY0 related interrupt
 	movi r2, KEY0				# by setting the corresponding bit
@@ -209,13 +209,13 @@ main:	#does this subroutine executes without being called?
 	movi r7, 0b1111		# write parameter to switch LED0-LED3 on
 	call write_LED		# write_LED(r7)
 	
-	movia r15, 20		# r15 <- 20 = 2ms
+	movia r15, 20		# r15 <- 20 = 2ms. #change this constant value by the current wait value
 	call wait		# wait(r15)
 	
-	movi r7, 0b0011		# write parameter to switch LED0-LED1 on
+	movi r7, 0b0011		# write parameter to switch L ED0-LED1 on
 	call write_LED		# write_LED(r15)
 	
-	movia r15, 80		# r15 <- 80 = 8 ms
+	movia r15, 80		# r15 <- 80 = 8 ms. #change this constant value by the current wait value
 	call wait		# wait(r15)
 	
 	beq r0, r0, main	# while(true) goto main
@@ -352,7 +352,7 @@ init_intController:	#very start
 	# enable (unmask) Buttons PIO interupts
 	movia r2, BUTTONS_IRQ	#why BUTTONS_IRQ=0b0010?	# Buttons(mask) PIO IRQ Level
 	rdctl r3, ctl3
-	or r3, r3, r2	#mask ctl3 or 0b0010 for IRQ1 (did we choose IRQ1 arbitrarily?)
+	or r3, r3, r2	#mask ctl3 or 0b0010 for IRQ1 (why did we choose IRQ1?)
 	wrctl ctl3, r3	#mask ctl3 value. why Prof. name it unmask? How to implement unmasking?
 
 	# enable CPU interrupts
