@@ -113,7 +113,8 @@ end_ir:
 # increase LEDs intensity.
 ###############################################################
 KEY0_ISR:
-	#increment r15 addi r15,r15,1
+	#if (LED on-time<10ms) LED on-time=LED on-time+1ms
+	##increment r15 addi r15,r15,1
 	ret
 	
 ###############################################################
@@ -123,7 +124,8 @@ KEY0_ISR:
 # in order to decrease LEDs intensity.
 ###############################################################
 KEY3_ISR:
-	#decrement r15 subi r15,r15,1 
+	#if (LED on-time>=0ms) LED on-time=LED on-time+1ms
+	##decrement r15 subi r15,r15,1 
 	ret
 	
 ###############################################################
