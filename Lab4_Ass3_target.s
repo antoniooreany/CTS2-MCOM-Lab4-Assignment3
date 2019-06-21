@@ -54,7 +54,7 @@ STACK_END:
 # normally is address 0x20.
 ###############################################################
 .section .exceptions, "ax"
-interrupt_handler:
+interrupt_handler:	#does this handler executes without being called?
 	# Save used registers on stacks, r31 must be saved because
 	# subroutines are used
 	subi sp, sp, 4
@@ -69,9 +69,9 @@ interrupt_handler:
 								# exit exception handler
 
 	# Check if KEY0 is the source for Buttons interrupt
-	movia et, BUTTONS
-	ldw r2, 0xC(et)				# read Buttons PIO edgecapture register
-	andi r2, r2, KEY0			# mask KEY0 related bit
+	movia et, BUTTONS		#(BUTTONS=0xFF200050)	# base address of port Buttons
+	ldw r2, 0xC(et)				# (edgecapture=0xFF20005C) read Buttons PIO edgecapture register
+	andi r2, r2, KEY0			# (KEY0=0b0001)mask KEY0 related bit
 	beq r2, zero, btn3_isr
 	call KEY0_ISR				# KEY0 has been pressed, do the
 								# corresponding interuupt handling
@@ -83,8 +83,8 @@ interrupt_handler:
 
 	# Check if KEY3 is the source for Buttons interrupt
 btn3_isr:
-	movia et, BUTTONS
-	ldw r2, 0xc(et)				# read Buttons PIO edgecapture reg.
+	movia et, BUTTONS		#(BUTTONS=0xFF200050)	# base address of port Buttons
+	ldw r2, 0xc(et)				# (edgecapture=0xFF20005C) read Buttons PIO edgecapture reg.
 	andi r2, r2, KEY3			# mask KEY3 related bit
 	beq r2, zero, end_ir
 	call KEY3_ISR				# KEY3 has been pressed, do the
@@ -112,7 +112,7 @@ end_ir:
 # 10 ms, than this value will be incremented in order to 
 # increase LEDs intensity.
 ###############################################################
-KEY0_ISR:
+KEY0_ISR:	#does this subroutine executes without being called?
 	#if (LED on-time<10ms) LED on-time=LED on-time+1ms
 	##increment r15 addi r15,r15,1
 	ret
@@ -123,7 +123,7 @@ KEY0_ISR:
 # greater or equal to 0, than this value will be incremented 
 # in order to decrease LEDs intensity.
 ###############################################################
-KEY3_ISR:
+KEY3_ISR:	#does this subroutine executes without being called?
 	#if (LED on-time>=0ms) LED on-time=LED on-time+1ms
 	##decrement r15 subi r15,r15,1 
 	ret
@@ -205,7 +205,7 @@ _start:
 					# begin at end of section
 START:
 ###############################################
-main:
+main:	#does this subroutine executes without being called?
 	movi r7, 0b1111		# write parameter to switch LED0-LED3 on
 	call write_LED		# write_LED(r7)
 	
@@ -224,7 +224,7 @@ wait:
 	subi sp, sp, 4		# PUSH_r15_1
 	stw r15, (sp)		# PUSH_r15_2
 	
-	muli r15, r15, 10000	# modify r15 to make it as int parameter for init_timer() with step 0.1ms 
+	muli r15, r15, 10.000	# modify r15 to make it as int parameter for init_timer() with step 0.1ms 
 
 	subi sp, sp, 4		# PUSH_r31_1 (before calling the 2nd level subrotines)
 	stw r31, (sp)		# PUSH_r31_2 (before calling the 2nd level subrotines)
